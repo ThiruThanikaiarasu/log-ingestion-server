@@ -1,0 +1,9 @@
+services:
+    api:
+        container_name: nodejs_api
+        build: .
+        ports:
+          - 3500:3500
+        volumes:
+          - ./.env:/app/.env
+      

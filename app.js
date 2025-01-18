@@ -3,6 +3,7 @@ const express = require('express')
 const app = express()
 
 const logRoute = require('./routes/logRoute')
+const { shutdown } = require('./services/logService')
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
