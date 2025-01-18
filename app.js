@@ -3,7 +3,6 @@ const express = require('express')
 const app = express()
 
 const logRoute = require('./routes/logRoute')
-const { startBufferProcessing } = require('./services/bufferService')
 
 app.use(express.json())
 app.use(express.urlencoded({ extended: true }))
@@ -44,6 +43,5 @@ process.on('SIGINT', async () => {
     }
 })
 
-startBufferProcessing()
 
-app.listen(3500, console.log('Server running at http://localhost:3500'))
+module.exports = app
