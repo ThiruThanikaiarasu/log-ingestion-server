@@ -1,0 +1,35 @@
+version: 2.1
+jobs:
+    install_dependencies:
+        docker:
+            - image: circleci/node:current
+        steps:
+            - checkout
+            - run:
+                name: Install npm dependencies
+                command: |
+                    npm install
+    build_docker_image:
+        docker:
+            - image: circleci/node:current
+        steps:
+            - checkout
+            - setup_remote_docker:
+                docker_layer_caching: false
+            - run:
+                name: Debug environment variables
+                command: |
+                    echo "DOCKER_USERNAME=$DOCKER_USERNAME"
+                    echo "DOCKER_PASSWORD=$DOCKER_PASSWORD"
+            - run:
+                name: Build and Push Docker Image
+                command: |
+                    docker build -t opportune-server -t ${DOCKER_USERNAME}/log-ingestion-server-v2:latest .
+                    echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
+                    docker push ${DOCKER_USERNAME}/log-ingestion-server-v2:latest
+
+workflows:
+    build_and_deploy:
+        jobs:
+            - install_dependencies
+            - build_docker_image
