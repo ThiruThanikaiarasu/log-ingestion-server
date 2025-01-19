@@ -1,9 +1,36 @@
 services:
     api:
-        container_name: nodejs_api
+        image: thiruthanikaiarasu/log-ingestion-server-v2:latest
         build: .
-        ports:
-          - 3500:3500
         volumes:
-          - ./.env:/app/.env
-      
+            - ./.env:/app/.env
+        deploy:
+            replicas: 4
+            resources:
+                limits:
+                    cpus: '0.75'
+                    memory: '512M'
+        ulimits:
+            nofile:
+                soft: 65536
+                hard: 65536
+        expose:
+            - "3500"
+            
+    nginx:
+        image: nginx:latest
+        volumes:
+            - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+            - ./nginx/conf.d:/etc/nginx/conf.d:ro
+        depends_on:
+            - api
+        ports:
+            - "3500:3500"
+        ulimits:
+            nofile:
+                soft: 65536
+                hard: 65536
+
+networks:
+    default:
+        driver: bridge
