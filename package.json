@@ -5,7 +5,9 @@
   "scripts": {
     "start": "nodemon server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
+    "test-logs": "node scripts/logDataIntegrityTest.js",
     "test-load": "node scripts/loadtest.js"
+    
   },
   "keywords": [],
   "author": "",
