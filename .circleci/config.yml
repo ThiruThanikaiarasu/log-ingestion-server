@@ -24,9 +24,9 @@ jobs:
             - run:
                 name: Build and Push Docker Image
                 command: |
-                    docker build -t opportune-server -t ${DOCKER_USERNAME}/log-ingestion-server-v2:latest .
+                    docker build -t opportune-server -t ${DOCKER_USERNAME}/log-ingestion-server:latest .
                     echo $DOCKER_PASSWORD | docker login -u $DOCKER_USERNAME --password-stdin
-                    docker push ${DOCKER_USERNAME}/log-ingestion-server-v2:latest
+                    docker push ${DOCKER_USERNAME}/log-ingestion-server:latest
 
 workflows:
     build_and_deploy:
