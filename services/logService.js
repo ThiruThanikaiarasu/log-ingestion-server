@@ -3,12 +3,14 @@ const cluster = require('cluster')
 
 const { BATCH_SIZE, FLUSH_INTERVAL } = require("../configuration/constants")
 const { uploadFileToS3 } = require("./s3Service")
+const { addRecordToDB } = require('../repositories/logRepository')
 
 
 const bufferEmitter = new EventEmitter()
 
 let messageBuffer = []
 let bufferSize = 0
+let requestCount = 0
 let lastFlushTime = Date.now()
 let isProcessing = false
 let flushInterval = null
@@ -41,6 +43,7 @@ const flushToS3 = async (retryCount = 0) => {
         const filename = getFilename()
 
         await uploadFileToS3(filename, data)
+        await addRecordToDB(filename, requestCount)
         
         if (bufferSize === currentSize && 
             JSON.stringify(messageBuffer) === JSON.stringify(currentBuffer)) {
@@ -86,6 +89,7 @@ const sendMessageToBuffer = async (message) => {
 
         messageBuffer.push(messageStr)
         bufferSize += Buffer.byteLength(messageStr, 'utf8')
+        requestCount++
         
         bufferEmitter.emit('messageReceived', messageStr)
 

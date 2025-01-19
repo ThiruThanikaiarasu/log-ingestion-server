@@ -3,6 +3,7 @@ const numCPUs = require('os').cpus().length
 const app = require('./app')
 const { startBufferProcessing } = require('./services/bufferService')
 const { shutdown, on } = require('./services/logService')
+const connectToDatabase = require('./database/connection')
 
 const PORT = process.env.PORT || 3000
 
@@ -27,6 +28,24 @@ if (cluster.isMaster) {
         console.log(`Worker ${worker.process.pid} died. Restarting...`)
         cluster.fork()
     })
+
+    connectToDatabase()
+        .then(() => {
+            console.log(`Master process ${process.pid} connected to database`)
+
+            process.on('SIGINT', async () => {
+                console.log('Master shutting down...')
+                for (const id in cluster.workers) {
+                    cluster.workers[id].send('shutdown')
+                }
+                await mongoose.disconnect()
+                process.exit(0)
+            })
+        })
+        .catch((error) => {
+            console.error(`Master process ${process.pid} failed to connect to database: ${error}`)
+            process.exit(1)
+        })
 
     process.on('SIGTERM', async () => {
         console.log('Master received SIGTERM. Starting graceful shutdown...')
@@ -75,7 +94,51 @@ if (cluster.isMaster) {
         }
     })
 
-    const server = app.listen(PORT, () => {
-        console.log(`Worker ${process.pid} listening on port ${PORT}`)
-    })
+    // const server = app.listen(PORT, () => {
+    //     console.log(`Worker ${process.pid} listening on port ${PORT}`)
+    // })
+
+    const startServer = async () => {
+        await connectToDatabase() 
+    
+        const server = app.listen(PORT, () => {
+            console.log(`Worker ${process.pid} listening on port ${PORT}`)
+        })
+    }
+    
+    // if (cluster.isMaster) { 
+    //     connectToDatabase()
+    //         .then(() => {
+    //             app.listen(process.env.PORT, () => {
+    //                 console.log(`Server is running at http://localhost:${process.env.PORT}`)
+    //             })
+    //         })
+    //         .catch(error => {
+    //             console.error(`Error while connecting to database: ${error}`)
+    //         })
+    // } else {
+    //     startServer()
+    // }
+
+    if (cluster.isMaster) {
+        connectToDatabase()
+            .then(() => {
+                console.log(`Master process ${process.pid} connected to database`)
+    
+                process.on('SIGINT', async () => {
+                    console.log('Master shutting down...')
+                    for (const id in cluster.workers) {
+                        cluster.workers[id].send('shutdown')
+                    }
+                    await mongoose.disconnect()
+                    process.exit(0)
+                })
+            })
+            .catch((error) => {
+                console.error(`Master process ${process.pid} failed to connect to database: ${error}`)
+                process.exit(1)
+            })
+    } else {
+        startServer()
+    }
 }
