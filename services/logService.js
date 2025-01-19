@@ -11,6 +11,7 @@ const bufferEmitter = new EventEmitter()
 let messageBuffer = []
 let bufferSize = 0
 let requestCount = 0
+let workerRequests = new Map()
 let lastFlushTime = Date.now()
 let isProcessing = false
 let flushInterval = null
@@ -18,7 +19,13 @@ const MAX_RETRIES = 3
 
 const sendMessageToMaster = (message) => {
     if (cluster.isWorker) {
-        process.send({ type: 'bufferMessage', message })
+        process.send(
+            { 
+                type: 'bufferMessage', 
+                message,
+                workerRequestCount: 1 
+            }
+        )
         return true
     }
     return false
@@ -27,6 +34,11 @@ const sendMessageToMaster = (message) => {
 const getFilename = () => {
     const date = new Date()
     return `logs/${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}/${Date.now()}.log`
+}
+
+const getTotalRequestCount = () => {
+    const workerTotal = Array.from(workerRequests.values()).reduce((sum, count) => sum + count, 0)
+    return requestCount + workerTotal
 }
 
 const flushToS3 = async (retryCount = 0) => {
@@ -43,12 +55,14 @@ const flushToS3 = async (retryCount = 0) => {
         const filename = getFilename()
 
         await uploadFileToS3(filename, data)
-        await addRecordToDB(filename, requestCount)
+        await addRecordToDB(filename, getTotalRequestCount())
         
         if (bufferSize === currentSize && 
             JSON.stringify(messageBuffer) === JSON.stringify(currentBuffer)) {
             messageBuffer = []
             bufferSize = 0
+            requestCount = 0  
+            workerRequests.clear()
         }
         
         lastFlushTime = Date.now()
@@ -121,7 +135,16 @@ const startProcessing = () => {
                 bufferSize += Buffer.byteLength(msg.message, 'utf8')
                 
                 bufferEmitter.emit('messageReceived', msg.message)
+
+                const currentCount = workerRequests.get(worker.id) || 0
+                workerRequests.set(worker.id, currentCount + msg.workerRequestCount)
+                
+                bufferEmitter.emit('messageReceived', msg.message)
             }
+        })
+
+        cluster.on('disconnect', (worker) => {
+            workerRequests.delete(worker.id)
         })
     }
 
@@ -162,6 +185,9 @@ const getBufferStatus = () => {
     return {
         messageCount: messageBuffer.length,
         bufferSize: bufferSize,
+        totalRequests: getTotalRequestCount(),
+        workerRequests: Object.fromEntries(workerRequests),
+        masterRequests: requestCount,
         lastFlushTime: lastFlushTime,
         isProcessing: isProcessing
     }
